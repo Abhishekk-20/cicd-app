@@ -70,11 +70,7 @@ jobs:
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
 
       - name: Scan image with Trivy
-<<<<<<< HEAD
-        uses: aquasecurity/trivy-action@0.36.0
-=======
-        uses: aquasecurity/trivy-action@v0.36.0
->>>>>>> 92819ff (fix trivy version)
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
           format: table
