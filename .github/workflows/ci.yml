@@ -85,3 +85,37 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: Abhishekk-20/cicd-app-gitops
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      - name: Update GitOps image tag
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          sed -i -E "s|^  tag:.*|  tag: \"${IMAGE_TAG}\"|" \
+            gitops/charts/cicd-app/values.yaml
+          grep -n '^  tag:' gitops/charts/cicd-app/values.yaml
+
+      - name: Commit and push GitOps update
+        working-directory: gitops
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add charts/cicd-app/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "Image tag is already current."
+            exit 0
+          fi
+
+          git commit -m "Deploy cicd-app ${IMAGE_TAG}"
+          git push origin main
