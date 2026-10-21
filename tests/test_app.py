@@ -15,6 +15,7 @@ def test_home(client):
     assert response.status_code == 200
     assert response.json["message"] == "CI/CD Demo Application"
     assert response.json["status"] == "running"
+    assert response.json["version"] == "1.0.1"
 
 
 def test_health(client):
