@@ -1,63 +1,136 @@
-# CI/CD Demo Application
+# DevOps Project Report: Automated CI/CD Pipeline with GitHub Actions, Docker, Trivy, GHCR, Kubernetes and Argo CD
 
-A small Flask application demonstrating a CI/CD pipeline with container security scanning, a production approval gate, and GitOps-based Kubernetes deployment.
+A step-by-step report for a Flask application delivered through CI checks, container security scanning, GitHub Container Registry (GHCR), a production approval gate, and GitOps deployment with Helm and Argo CD.
 
-## Architecture
+> **Project scope:** This implementation deploys the Flask demo application to the `cicd-app` namespace in a Kubernetes cluster managed by KIND. It demonstrates a cloud-native delivery workflow; the current deployment target documented here is Kubernetes/KIND, not an AWS-managed EKS cluster.
 
-```text
-Push to main / Pull request
-          |
-          v
-  Ruff lint + pytest
-          |
-          | main branch only
-          v
- Build Docker image -> Trivy scan for CRITICAL vulnerabilities -> Push to GHCR
-          |
-          v
- GitHub Environment: production (required reviewer approval)
-          |
-          v
- Update image tag in cicd-app-gitops repository
-          |
-          v
- Argo CD syncs the Helm chart to Kubernetes
-          |
-          v
-  Running application
+---
 
-Main-branch pipeline failures -> Slack Incoming Webhook notification
+## Table of Contents
+
+1. [Project Overview](#1-project-overview)
+2. [Architecture Diagram](#2-architecture-diagram)
+3. [Repository Structure](#3-repository-structure)
+4. [Step 1: Flask Application and Unit Tests](#4-step-1-flask-application-and-unit-tests)
+5. [Step 2: Docker Containerization](#5-step-2-docker-containerization)
+6. [Step 3: GitHub Actions CI Pipeline](#6-step-3-github-actions-ci-pipeline)
+7. [Step 4: Trivy Security Scan and GHCR Publishing](#7-step-4-trivy-security-scan-and-ghcr-publishing)
+8. [Step 5: Production Approval Gate](#8-step-5-production-approval-gate)
+9. [Step 6: GitOps with Helm and Argo CD](#9-step-6-gitops-with-helm-and-argo-cd)
+10. [Step 7: Verify the Kubernetes Deployment](#10-step-7-verify-the-kubernetes-deployment)
+11. [Step 8: Slack Failure Notifications](#11-step-8-slack-failure-notifications)
+12. [Step 9: Manual GitOps Rollback](#12-step-9-manual-gitops-rollback)
+13. [Workflow Diagram](#13-workflow-diagram)
+14. [Conclusion](#14-conclusion)
+
+---
+
+## 1. Project Overview
+
+The project demonstrates an automated delivery process for a small Flask application. Source changes are checked in GitHub Actions, container images are built and scanned, approved images are published to GHCR, and the GitOps repository is updated only after the production environment approval gate.
+
+The separate GitOps repository stores the desired Kubernetes state in a Helm chart. Argo CD watches that repository and reconciles the Helm release into Kubernetes.
+
+### Key features
+
+- **Continuous Integration:** Ruff linting and pytest unit tests.
+- **Containerization:** Docker image built with Docker Buildx.
+- **Security scanning:** Trivy blocks publishing when the configured scan finds vulnerabilities that meet the **CRITICAL** severity rule.
+- **Image registry:** Commit-SHA image tags in GHCR.
+- **Deployment approval:** GitHub Environment named `production`.
+- **GitOps delivery:** GitHub Actions updates the Helm values file; Argo CD syncs the desired state.
+- **Failure notification:** Slack Incoming Webhook alerts for main-branch job failures.
+- **Rollback:** A previous image tag can be restored by reverting the GitOps deployment commit.
+
+### Repositories
+
+- **Application and workflow:** [Abhishekk-20/cicd-app](https://github.com/Abhishekk-20/cicd-app)
+- **Helm chart and Argo CD application:** [Abhishekk-20/cicd-app-gitops](https://github.com/Abhishekk-20/cicd-app-gitops)
+
+---
+
+## 2. Architecture Diagram
+
+The production path below applies to pushes to `main`. Pull requests run lint and unit tests; image publication and GitOps updating are limited to main-branch pushes.
+
+```mermaid
+flowchart TD
+    Dev["Developer"] --> AppRepo["Application GitHub Repository"]
+    AppRepo --> CI["GitHub Actions"]
+    CI --> Test["Ruff lint + pytest"]
+    Test --> Build["Build Docker image"]
+    Build --> Scan["Trivy CRITICAL vulnerability scan"]
+    Scan --> GHCR["Publish SHA-tagged image to GHCR"]
+    GHCR --> Gate["GitHub Environment: production approval"]
+    Gate --> GitOps["Update image tag in GitOps repository"]
+    GitOps --> Argo["Argo CD detects Git change"]
+    Argo --> Helm["Helm chart reconciliation"]
+    Helm --> K8s["Kubernetes / KIND"]
+    K8s --> App["Flask app: 2 replicas"]
+    CI -. "main-branch failure" .-> Slack["Slack alert"]
 ```
 
-Pull requests run lint and unit tests. Image publishing and the GitOps update run only after a push to `main`.
+---
 
-## Repositories
+## 3. Repository Structure
 
-- Application and workflow: https://github.com/Abhishekk-20/cicd-app
-- Helm chart and Argo CD configuration: https://github.com/Abhishekk-20/cicd-app-gitops
+### Application repository
 
-## Technology stack
+```text
+cicd-app/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── tests/
+│   └── test_app.py
+├── docs/
+│   └── images/
+├── app.py
+├── Dockerfile
+├── requirements.txt
+├── requirements-dev.txt
+├── pyproject.toml
+└── README.md
+```
 
-- Python, Flask, Gunicorn
-- Ruff and pytest
-- Docker and Docker Buildx
-- GitHub Actions
-- Trivy image vulnerability scanning
-- GitHub Container Registry (GHCR)
-- Kubernetes, Helm, and Argo CD
-- Slack Incoming Webhooks for failure alerts
+### GitOps repository
 
-## Application endpoints
+```text
+cicd-app-gitops/
+├── argocd/
+│   └── application.yaml
+└── charts/
+    └── cicd-app/
+        ├── Chart.yaml
+        ├── values.yaml
+        └── templates/
+            ├── deployment.yaml
+            └── service.yaml
+```
+
+---
+
+## 4. Step 1: Flask Application and Unit Tests
+
+The Flask application exposes three endpoints:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /` | Returns application status and version |
+| `GET /` | Application status and version |
 | `GET /health` | Health check |
 | `GET /api/info` | Application metadata |
 
-## Run checks locally
+The project includes pytest tests and uses Ruff to check code style before a container image is built.
 
-Use Python 3.12 or a compatible environment:
+**Application source — `app.py`**
+
+![Actual Flask application source in GitHub](docs/images/app-source.png)
+
+**Unit tests — `tests/test_app.py`**
+
+![Actual unit test file in GitHub](docs/images/unit-tests.png)
+
+To run the checks locally from the application directory:
 
 ```bash
 python3 -m venv .venv
@@ -67,50 +140,140 @@ ruff check .
 python -m pytest -v
 ```
 
-Build the container image:
+---
+
+## 5. Step 2: Docker Containerization
+
+The Dockerfile packages the Flask app for consistent execution in CI and Kubernetes. The workflow uses Docker Buildx to build an image tagged with the commit SHA.
+
+**Dockerfile in the application repository**
+
+![Actual Dockerfile in GitHub](docs/images/dockerfile.png)
+
+Build a local image for a quick check:
 
 ```bash
 docker build -t cicd-app:local .
 ```
 
-Inspect the Dockerfile for the configured port and runtime command before running the container locally.
+The pipeline image name follows this format:
 
-## GitHub configuration
+```text
+ghcr.io/abhishekk-20/cicd-app:<git-commit-sha>
+```
 
-Configure these in the application repository's **Settings → Secrets and variables → Actions**:
+Commit-SHA tags make it possible to identify the exact application revision being deployed and to select a previous known-good image for rollback.
 
-| Secret | Purpose |
+---
+
+## 6. Step 3: GitHub Actions CI Pipeline
+
+The workflow is defined in `.github/workflows/ci.yml`.
+
+The **Lint and Unit Tests** job checks out the source, sets up Python 3.12, installs development dependencies, runs `ruff check .`, and runs `python -m pytest -v`.
+
+The workflow has path filters so changes limited to `README.md` or `docs/**` do not trigger a new deployment pipeline.
+
+**Workflow configuration**
+
+![Actual GitHub Actions workflow YAML in GitHub](docs/images/ci-workflow.png)
+
+**Successful Actions run**
+
+![Screenshot of a successful project GitHub Actions run](docs/images/github-actions-success.png)
+
+[View the recorded successful GitHub Actions run](https://github.com/Abhishekk-20/cicd-app/actions/runs/40207172479)
+
+---
+
+## 7. Step 4: Trivy Security Scan and GHCR Publishing
+
+After lint and tests pass on a push to `main`, the image job:
+
+1. Sets up Docker Buildx and logs in to GHCR using the workflow-provided `GITHUB_TOKEN`.
+2. Builds the image using the current commit SHA as its tag.
+3. Scans the built image using Trivy.
+4. Pushes the image to GHCR only if the scan succeeds.
+
+The scan is configured with `severity: CRITICAL`, `exit-code: "1"`, and `ignore-unfixed: true`. Vulnerabilities matching the configured rules can stop the pipeline before the push step.
+
+The image job grants `packages: write`; the workflow does not store the registry token in the repository. Ensure the GHCR package is pullable by the Kubernetes cluster (for example, make the package public or configure an image pull secret if it is private).
+
+---
+
+## 8. Step 5: Production Approval Gate
+
+The `deploy` job references the GitHub Environment `production`. GitHub pauses this job for the required reviewer approval configured on that environment. After approval, the job checks out the GitOps repository using `GITOPS_TOKEN`, updates the Helm image tag, and pushes a GitOps commit.
+
+Configure these under the application repository's **Settings → Environments** and **Settings → Secrets and variables → Actions**:
+
+| Configuration | Purpose |
 | --- | --- |
-| `GITOPS_TOKEN` | Token with the required contents write access to `cicd-app-gitops` |
-| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL for failure alerts |
+| Environment: `production` | Approval gate before GitOps changes |
+| `GITOPS_TOKEN` secret | Write access to the `cicd-app-gitops` repository |
+| `SLACK_WEBHOOK_URL` secret | Slack Incoming Webhook for failure alerts |
 
-The workflow uses the automatically provided `GITHUB_TOKEN` to publish images to GHCR. Make sure the workflow has package write permission and the image is pullable by the cluster (public package or an appropriately configured image pull secret).
+The secret values must be added in GitHub Settings; never copy their values into source control or this README.
 
-Create a GitHub Environment named `production` and configure required reviewers under **Settings → Environments**. The `deploy` job must pass this environment gate before it can update the GitOps repository.
+---
 
-Never put tokens, webhook URLs, account identifiers, or other secrets in source control or this README.
+## 9. Step 6: GitOps with Helm and Argo CD
 
-## Deployment checks
+The `cicd-app-gitops` repository is the source of desired deployment state. The application workflow changes the `image.tag` in `charts/cicd-app/values.yaml` to the new Git commit SHA. Argo CD watches the GitOps repository and automatically reconciles the Helm chart.
 
-These commands assume the cluster context points to the intended Kubernetes cluster:
+### Argo CD Application
+
+The manifest at `argocd/application.yaml` points Argo CD at the `charts/cicd-app` path in the GitOps repository. Automated sync, pruning, and self-healing are configured in the manifest.
+
+![Actual Argo CD Application manifest in GitHub](docs/images/argocd-application.png)
+
+### Helm Deployment and Service
+
+The Helm chart defines a two-replica Flask deployment, health probes, container security settings, and a ClusterIP service mapping service port 80 to the application container port 5000.
+
+**Deployment template**
+
+![Actual Helm Deployment template in GitHub](docs/images/helm-deployment.png)
+
+**Service template**
+
+![Actual Helm Service template in GitHub](docs/images/helm-service.png)
+
+**Image tag in the GitOps values file**
+
+![Actual GitOps Helm values file with the restored known-good image tag](docs/images/gitops-values.png)
+
+The GitOps repository is available at [cicd-app-gitops](https://github.com/Abhishekk-20/cicd-app-gitops).
+
+---
+
+## 10. Step 7: Verify the Kubernetes Deployment
+
+The deployment was verified in the `cicd-app` namespace with two running application replicas, a successful rollout, a healthy Argo CD Application, and successful HTTP responses from the Flask endpoints.
+
+Run these commands against your cluster context:
 
 ```bash
-kubectl get application cicd-app -n argocd
-kubectl get deployment,pods,svc -n cicd-app
+kubectl get pods -n cicd-app
 kubectl rollout status deployment/cicd-app -n cicd-app
+kubectl get application cicd-app -n argocd
 kubectl get deployment cicd-app -n cicd-app \
   -o=jsonpath='{.spec.template.spec.containers[0].image}{"\\n"}'
 ```
 
-Check the Argo CD Application for `Synced` and `Healthy`, and compare the configured deployment image tag with `charts/cicd-app/values.yaml` in the GitOps repository.
+Expected checks:
+- Both `cicd-app` pods are `Running` and `1/1 Ready`.
+- The deployment rollout completes successfully.
+- The Argo CD Application reports `Synced` and `Healthy`.
+- The live Deployment image matches the image tag in `charts/cicd-app/values.yaml`.
 
-To test the app locally through a cluster service, run this in one terminal:
+To test the service locally, start port-forwarding in one terminal:
 
 ```bash
 kubectl port-forward -n cicd-app svc/cicd-app 8080:80
 ```
 
-Then, in another terminal:
+Then, from another terminal:
 
 ```bash
 curl -i http://localhost:8080/health
@@ -118,75 +281,95 @@ curl -i http://localhost:8080/api/info
 curl -i http://localhost:8080/
 ```
 
-If port-forwarding stops, restart it before using `curl`.
+Observed responses included `HTTP/1.1 200 OK`, `{"status":"healthy"}`, and the root endpoint reporting application version `1.0.1`. If port-forwarding is stopped, restart it before calling `curl`.
 
-## Manual rollback
+---
 
-This project demonstrates a **manual GitOps rollback** by reverting the commit that introduced a bad image tag. First confirm the exact deployment commit and that the working tree is clean. Do not blindly revert the latest commit if it is already a rollback or contains unrelated changes.
+## 11. Step 8: Slack Failure Notifications
+
+The `notify-failure` job uses the `SLACK_WEBHOOK_URL` repository secret to post an alert for main-branch pushes when any of these jobs fails:
+
+- Lint and Unit Tests
+- Build, Scan and Publish
+- Approve and Update GitOps
+
+The message contains the repository, branch, commit SHA, and link to the Actions run. The notification job is skipped for a successful run. If the webhook secret is empty, the step exits without sending a message. Do not deliberately break the production pipeline just to test alerts; use a separate test branch or a safe test workflow if you want to validate the webhook.
+
+---
+
+## 12. Step 9: Manual GitOps Rollback
+
+This project has demonstrated a GitOps rollback. The latest deployment commit was reverted, the GitOps image tag was restored to the previously working image, and Argo CD reported `Synced` and `Healthy` while the live Kubernetes Deployment used that previous SHA-tagged image.
+
+A rollback changes the desired image tag in Git; it does not roll back Git history destructively and it is not an automatic rollback controller.
+
+### Inspect recent deployment commits
 
 ```bash
 cd ~/cicd-app-gitops
 git status --short
 git log -5 --oneline -- charts/cicd-app/values.yaml
+grep -n '^  tag:' charts/cicd-app/values.yaml
 ```
 
-Choose the commit that deployed the undesired image tag, then revert that commit and push:
+Ensure the working tree is clean. Identify the commit that introduced the bad image tag. Do not blindly revert the newest commit if it is already a rollback or contains unrelated changes.
+
+### Revert the offending deployment commit
+
+Replace `<bad-deployment-commit>` with the identified commit SHA:
 
 ```bash
 git revert <bad-deployment-commit>
 git push origin main
 ```
 
-Argo CD should reconcile the restored image tag. Verify the result:
+Argo CD should detect the new Git commit and reconcile the restored Helm values. If it does not sync, inspect the Argo CD Application status and trigger a sync using your configured Argo CD CLI or UI.
+
+### Verify the rollback
 
 ```bash
 kubectl rollout status deployment/cicd-app -n cicd-app
+
 kubectl get deployment cicd-app -n cicd-app \
   -o=jsonpath='{.spec.template.spec.containers[0].image}{"\\n"}'
+
 kubectl get application cicd-app -n argocd \
   -o=jsonpath='Sync={.status.sync.status} Health={.status.health.status}{"\\n"}'
 ```
 
-A successful rollback should show the expected previous image tag, a completed rollout, and Argo CD reporting `Synced` and `Healthy`. This is a GitOps-based manual rollback, not an automated rollback controller.
+The verified rollback image tag for this run was:
 
-## Failure notifications
+```text
+ghcr.io/abhishekk-20/cicd-app:34e29d1f18424f271c890cb890ab867e02c1b7c7
+```
 
-For pushes to `main`, the workflow attempts to notify Slack when the test, image build/scan/publish, or GitOps update job fails. If the webhook secret is missing, the notification step skips sending. Check the GitHub Actions run logs first; never print or share the webhook URL.
+The application continued to return HTTP 200 after the rollback; both the GitOps desired tag and live Kubernetes image were checked.
 
-## Project Screenshots
+---
 
-The following images document the actual public repository and the CI/CD run. The pipeline overview image was supplied from the real Actions run; the code/configuration images are captures of files in these repositories.
+## 13. Workflow Diagram
 
-### 1. Successful GitHub Actions run
+```mermaid
+flowchart TD
+    A["Push or pull request"] --> B["Ruff + pytest"]
+    B -->|Pull request| C["CI result"]
+    B -->|Push to main| D["Build image"]
+    D --> E["Trivy scan"]
+    E --> F["Push image to GHCR"]
+    F --> G["Wait for production approval"]
+    G --> H["Update GitOps Helm values"]
+    H --> I["Argo CD sync"]
+    I --> J["Kubernetes rollout"]
+    J --> K["Verify application"]
+    B -. "Failure on main" .-> L["Slack notification"]
+    D -. "Failure on main" .-> L
+    H -. "Failure on main" .-> L
+```
 
-This run shows the lint/test, build-scan-publish, and GitOps-update jobs succeeding. The Slack notification job is skipped when the pipeline succeeds.
+---
 
-![Actual GitHub Actions run](docs/images/github-actions-success.png)
+## 14. Conclusion
 
-[Open the recorded Actions run](https://github.com/Abhishekk-20/cicd-app/actions/runs/40199703067)
+This project demonstrates an end-to-end cloud-native delivery workflow using GitHub Actions, Docker, Trivy, GHCR, GitHub Environment protection, Helm, Argo CD, and Kubernetes. It includes tested application endpoints, commit-SHA image tagging, an approval gate before GitOps promotion, Slack failure notifications, and a manual GitOps rollback procedure.
 
-### 2. CI/CD workflow definition
-
-![GitHub Actions workflow in the repository](docs/images/ci-workflow.png)
-
-### 3. Flask application source
-
-![Application source file](docs/images/app-source.png)
-
-### 4. Argo CD Application manifest
-
-This is the real GitOps manifest that points Argo CD to the Helm chart in this repository.
-
-![Argo CD Application manifest](docs/images/argocd-application.png)
-
-### 5. Kubernetes Deployment Helm template
-
-![Helm Deployment template](docs/images/helm-deployment.png)
-
-### 6. GitOps image tag and rollback target
-
-The screenshot shows the GitOps values file after restoring the previously working image tag.
-
-![GitOps Helm values with rollback image tag](docs/images/gitops-values.png)
-
-> These screenshots cover repository and GitHub Actions evidence. The Kubernetes pod output, live Argo CD dashboard, and `curl` responses come from the local cluster, so capture those directly on the machine running KIND if you want to show those specific live screens too.
+The implementation is suitable as a hands-on DevOps portfolio project. It should be described as a personal project, not as production work experience.
