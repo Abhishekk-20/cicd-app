@@ -153,13 +153,40 @@ A successful rollback should show the expected previous image tag, a completed r
 
 For pushes to `main`, the workflow attempts to notify Slack when the test, image build/scan/publish, or GitOps update job fails. If the webhook secret is missing, the notification step skips sending. Check the GitHub Actions run logs first; never print or share the webhook URL.
 
-
 ## Project Screenshots
 
-### GitHub Actions — successful CI/CD run
+The following images document the actual public repository and the CI/CD run. The pipeline overview image was supplied from the real Actions run; the code/configuration images are captures of files in these repositories.
 
-This screenshot is from the actual GitHub Actions run shown below. It records successful lint/tests, image build/scan/publish, and GitOps update jobs; the Slack notification job was skipped because the run was successful.
+### 1. Successful GitHub Actions run
 
-![Actual GitHub Actions run showing successful CI/CD jobs](docs/images/github-actions-success.png)
+This run shows the lint/test, build-scan-publish, and GitOps-update jobs succeeding. The Slack notification job is skipped when the pipeline succeeds.
 
-[Open the GitHub Actions run](https://github.com/Abhishekk-20/cicd-app/actions/runs/40199703067)
+![Actual GitHub Actions run](docs/images/github-actions-success.png)
+
+[Open the recorded Actions run](https://github.com/Abhishekk-20/cicd-app/actions/runs/40199703067)
+
+### 2. CI/CD workflow definition
+
+![GitHub Actions workflow in the repository](docs/images/ci-workflow.png)
+
+### 3. Flask application source
+
+![Application source file](docs/images/app-source.png)
+
+### 4. Argo CD Application manifest
+
+This is the real GitOps manifest that points Argo CD to the Helm chart in this repository.
+
+![Argo CD Application manifest](docs/images/argocd-application.png)
+
+### 5. Kubernetes Deployment Helm template
+
+![Helm Deployment template](docs/images/helm-deployment.png)
+
+### 6. GitOps image tag and rollback target
+
+The screenshot shows the GitOps values file after restoring the previously working image tag.
+
+![GitOps Helm values with rollback image tag](docs/images/gitops-values.png)
+
+> These screenshots cover repository and GitHub Actions evidence. The Kubernetes pod output, live Argo CD dashboard, and `curl` responses come from the local cluster, so capture those directly on the machine running KIND if you want to show those specific live screens too.
