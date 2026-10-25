@@ -152,3 +152,14 @@ A successful rollback should show the expected previous image tag, a completed r
 ## Failure notifications
 
 For pushes to `main`, the workflow attempts to notify Slack when the test, image build/scan/publish, or GitOps update job fails. If the webhook secret is missing, the notification step skips sending. Check the GitHub Actions run logs first; never print or share the webhook URL.
+
+
+## Project Screenshots
+
+### GitHub Actions — successful CI/CD run
+
+This screenshot is from the actual GitHub Actions run shown below. It records successful lint/tests, image build/scan/publish, and GitOps update jobs; the Slack notification job was skipped because the run was successful.
+
+![Actual GitHub Actions run showing successful CI/CD jobs](docs/images/github-actions-success.png)
+
+[Open the GitHub Actions run](https://github.com/Abhishekk-20/cicd-app/actions/runs/40199703067)
