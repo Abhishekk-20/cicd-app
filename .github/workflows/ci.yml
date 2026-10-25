@@ -92,8 +92,7 @@ jobs:
     needs: image
     if: >-
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      secrets.GITOPS_TOKEN != ''
+      github.ref == 'refs/heads/main'
 
     environment:
       name: production
@@ -151,7 +150,6 @@ jobs:
 
     steps:
       - name: Send Slack notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           REPO: ${{ github.repository }}
@@ -159,6 +157,11 @@ jobs:
           COMMIT: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL is not configured; skipping Slack notification."
+            exit 0
+          fi
+
           message=":x: CI/CD pipeline failed for ${REPO} on ${BRANCH}. Commit: ${COMMIT}. Details: ${RUN_URL}"
 
           jq -n --arg text "$message" '{text: $text}' |
