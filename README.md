@@ -124,11 +124,11 @@ The project includes pytest tests and uses Ruff to check code style before a con
 
 **Application source — `app.py`**
 
-![Actual Flask application source in GitHub](docs/images/app-source.png)
+**Application source:** [`app.py`](app.py)
 
 **Unit tests — `tests/test_app.py`**
 
-![Actual unit test file in GitHub](docs/images/unit-tests.png)
+**Unit tests:** [`tests/test_app.py`](tests/test_app.py)
 
 To run the checks locally from the application directory:
 
@@ -148,7 +148,7 @@ The Dockerfile packages the Flask app for consistent execution in CI and Kuberne
 
 **Dockerfile in the application repository**
 
-![Actual Dockerfile in GitHub](docs/images/dockerfile.png)
+**Dockerfile:** [`Dockerfile`](Dockerfile)
 
 Build a local image for a quick check:
 
@@ -176,7 +176,7 @@ The workflow has path filters so changes limited to `README.md` or `docs/**` do 
 
 **Workflow configuration**
 
-![Actual GitHub Actions workflow YAML in GitHub](docs/images/ci-workflow.png)
+**Workflow definition:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 **Successful Actions run**
 
@@ -225,7 +225,7 @@ The `cicd-app-gitops` repository is the source of desired deployment state. The 
 
 The manifest at `argocd/application.yaml` points Argo CD at the `charts/cicd-app` path in the GitOps repository. Automated sync, pruning, and self-healing are configured in the manifest.
 
-![Actual Argo CD Application manifest in GitHub](docs/images/argocd-application.png)
+**Argo CD Application manifest:** [`argocd/application.yaml`](https://github.com/Abhishekk-20/cicd-app-gitops/blob/main/argocd/application.yaml)
 
 ### Helm Deployment and Service
 
@@ -233,15 +233,15 @@ The Helm chart defines a two-replica Flask deployment, health probes, container 
 
 **Deployment template**
 
-![Actual Helm Deployment template in GitHub](docs/images/helm-deployment.png)
+**Helm Deployment template:** [`deployment.yaml`](https://github.com/Abhishekk-20/cicd-app-gitops/blob/main/charts/cicd-app/templates/deployment.yaml)
 
 **Service template**
 
-![Actual Helm Service template in GitHub](docs/images/helm-service.png)
+**Helm Service template:** [`service.yaml`](https://github.com/Abhishekk-20/cicd-app-gitops/blob/main/charts/cicd-app/templates/service.yaml)
 
 **Image tag in the GitOps values file**
 
-![Actual GitOps Helm values file with the restored known-good image tag](docs/images/gitops-values.png)
+**Helm values / image tag:** [`values.yaml`](https://github.com/Abhishekk-20/cicd-app-gitops/blob/main/charts/cicd-app/values.yaml)
 
 The GitOps repository is available at [cicd-app-gitops](https://github.com/Abhishekk-20/cicd-app-gitops).
 
